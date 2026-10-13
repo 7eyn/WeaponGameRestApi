@@ -9,7 +9,7 @@ using WeaponGameRestApi.Models;
 namespace WeaponGameRestApi.Core
 {
 
-    public abstract class Enemy : IDamageable, IEnemy, IEntity//, IMovement
+    public abstract class Enemy : IDamageable, IEnemy, IEntity,IPrototype<Enemy>//, IMovement
     {
 
         public event Action<Enemy, int> ?OnDamaged; 
@@ -35,6 +35,17 @@ namespace WeaponGameRestApi.Core
         public int Damage { get; protected set; }
         public string Id { get; set; }=  Guid.NewGuid().ToString();
 
+        public virtual Enemy Clone()
+        {
+            var clone = (Enemy)this.MemberwiseClone();
+            clone.Id = Guid.NewGuid().ToString();
+            clone.OnDamaged = null;
+            clone.OnDied = null;
+            clone.OnAttacked = null;
+            clone.OnStunnedPlayer = null;
+            clone.OnMultiShotAttack = null;
+            return clone;
+        }
         public Enemy(int health, int damage)
         {
             Health = health;

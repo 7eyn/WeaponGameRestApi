@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Linq;
 using WeaponGameRestApi.Core;
 using WeaponGameRestApi.Models;
+using WeaponGameRestApi.Repositories;
 using WeaponGameRestApi.Services;
 
 
@@ -19,95 +20,71 @@ namespace WeaponGameRestApi.Controllers
     {
         
         private readonly GameEngineService _gameEngineService;
-        private readonly IWeaponFactory _weaponFactory;
-        private readonly IEnemyFactory _enemyFactory;
-       public GameController(GameEngineService gameEngineService, IWeaponFactory weaponFactory, IEnemyFactory enemyFactory)
+        private readonly IRepository<Weapon> _weaponRepository;
+        private readonly IRepository<Enemy> _enemyRepository;
+
+        public GameController(
+             GameEngineService gameEngineService,
+             IRepository<Weapon> weaponRepository,
+             IRepository<Enemy> enemyRepository)
         {
             _gameEngineService = gameEngineService;
-            _weaponFactory = weaponFactory;
-            _enemyFactory = enemyFactory;
+            _weaponRepository = weaponRepository;
+            _enemyRepository = enemyRepository;
         }
-        [HttpPost("add-enemy")]
-        public IActionResult Add([FromBody] EnemyDto dto)
+        [HttpPost("add-enemy/{id}")]
+        public async Task<IActionResult> SpawnEnemy(string id)
         {
-            try
+            var templateEnemy = await _enemyRepository.GetAsync(id);
+            if (templateEnemy == null)
             {
-                var enemy = _enemyFactory.CreateEnemy(dto);
+                return NotFound(new { message = $"Enemy template with ID {id} not found." });
+            }
 
-                _gameEngineService.AddEnemy(enemy); 
-                return Ok(new { message = $"Enemy {enemy.Name} added" });
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new { error = ex.Message });
-            }
+            var gameEnemy = templateEnemy.Clone();
+            _gameEngineService.AddEnemy(gameEnemy);
+            return Ok(new { message = $"Enemy {gameEnemy.Name} spawned." });
         }
-        [HttpPost("add-weapon")]
-        public IActionResult AddWeapon([FromBody] WeaponDto dto)
+        [HttpPost("add-weapon/{id}")]
+        public async Task<IActionResult> AddWeapon(string id)
         {
-            try
+            var templateWeapon = await _weaponRepository.GetAsync(id);
+            if (templateWeapon == null)
             {
-               
-                string specificParam = "0";
-                if (dto.Type.Equals("Rifle", StringComparison.OrdinalIgnoreCase))
-                {
-                    specificParam = dto.IsAutomatic.ToString();
-                }
-                else
-                {
-                    if (dto.Type.Equals("Shotgun", StringComparison.OrdinalIgnoreCase))
-                    {
-                        specificParam = dto.PelletCount.ToString();
-                    }
-                }
-
-
-                string[] parts = new string[]
-                {
-            dto.Type,
-            dto.Name,
-            dto.Damage.ToString(),
-            dto.BulletSpeed.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            dto.MaxAmmo.ToString(),
-            dto.CurrentAmmo.ToString(),
-            dto.FireRate.ToString(System.Globalization.CultureInfo.InvariantCulture),
-            specificParam
-                };
-
-                
-                var weapon = _weaponFactory.CreateWeapon(dto);
-                _gameEngineService.AddWeapon(weapon);
-
-                _gameEngineService.SetWeapon(weapon);
-
-                return Ok(new { message = $"Weapon {weapon.Name} has been created " });
+                return NotFound(new { message = $"Weapon template with ID {id} not found." });
             }
-            catch (Exception ex)
+            var gameWeapon = templateWeapon.Clone();
+            _gameEngineService.AddWeapon(gameWeapon);
+            if (_gameEngineService.CurrentWeapon == null)
             {
-                return BadRequest(new { error = ex.Message });
+                _gameEngineService.SetWeapon(gameWeapon);
             }
+            return Ok(new { message = $"Weapon {gameWeapon.Name} has been added to the game." });
+            
+        }
+        [HttpPost("set-current-weapon/{id}")]
+        public IActionResult SetCurrentWeapon(string id)
+        {
+            var weapon = _gameEngineService.GetWeapon(id);
+            if (weapon == null)
+            {
+                return NotFound(new { message = $"Weapon with ID {id} is not in your arsenal." });
+            }
+
+            _gameEngineService.SetWeapon(weapon);
+            return Ok(new { message = $"Weapon {weapon.Name} has been set as the current weapon." });
         }
         [HttpGet("status")]
         public IActionResult GetStatus()
         {
             return Ok(new   
             {
-
                 PlayerHealth = _gameEngineService.CurrentPlayer.Health,
-                EnemiesCount = _gameEngineService.Enemies.Count
+                EnemiesCount = _gameEngineService.Enemies.Count,
+                CurrentWeapon = _gameEngineService.CurrentWeapon?.Name ?? "None"
             });
         }
-        [HttpGet("set-weapon")]
-        public IActionResult SetWeapon([FromQuery] int weaponId)
-        {
-            var weapon = _gameEngineService.GetWeapon(weaponId - 1);
-            if (weapon == null)
-            {
-                return NotFound(new { message = $"Weapon {weaponId} not found." });
-            }
-            _gameEngineService.SetWeapon(weapon);
-            return Ok(new { message = $"Weapon {weapon.Name} has been set as the current weapon." });
-        }
+        
 
         [HttpPost("shoot")]
         public IActionResult Shoot()
@@ -120,13 +97,18 @@ namespace WeaponGameRestApi.Controllers
         [HttpPost("enemy-attack")]
         public IActionResult EnemyAttack()
         {
-            foreach (var enemy in _gameEngineService.Enemies)
+            var activeEnemies = _gameEngineService.Enemies.Where(e => !e.IsDead).ToList();
+            if(!activeEnemies.Any())
             {
-                if (!enemy.IsDead)
-                {
+                return Ok(new { message = "No active enemies to attack the player." });
+            }
+            
+            foreach (var enemy in activeEnemies)
+            {
+                
                     _gameEngineService.EnemyAttackAction(enemy);
                     return Ok(new { message = $"Enemy {enemy.Name} attacked the player." });
-                }
+                
             }
             return Ok(new { message = "No active enemies to attack the player." });
         }

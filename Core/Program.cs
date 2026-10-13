@@ -5,6 +5,7 @@ using System.IO.IsolatedStorage;
 using System.Xml.Linq;
 using WeaponGameRestApi.Core;
 using WeaponGameRestApi.Hubs;
+using WeaponGameRestApi.Repositories;
 using WeaponGameRestApi.Services;
 
 
@@ -19,6 +20,7 @@ builder.Services.AddSingleton<IGameLogger, SignalRLogger>();
 builder.Services.AddSingleton<GameEngineService>();
 builder.Services.AddSingleton<IWeaponFactory, WeaponFactory>();
 builder.Services.AddSingleton<IEnemyFactory, EnemyFactory>();
+builder.Services.AddSingleton(typeof(IRepository<>), typeof(InMemoryRepository<>));
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

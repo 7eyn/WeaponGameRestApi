@@ -28,15 +28,11 @@ namespace WeaponGameRestApi.Services
                 _weapons.Add(weapon);
             }
         }
-        public Weapon? GetWeapon(int index)
+        public Weapon? GetWeapon(string id)
         {
             lock (_weaponsLock)
             {
-                if (index >= 0 && index < _weapons.Count)
-                {
-                    return _weapons[index];
-                }
-                return null;
+                return _weapons.FirstOrDefault(w => w.Id == id);
             }
         }
         public void SetWeapon(Weapon weapon)

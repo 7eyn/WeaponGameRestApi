@@ -9,7 +9,7 @@ using WeaponGameRestApi.Models;
 
 namespace WeaponGameRestApi.Core
 {
-    public class Weapon : IEntity
+    public abstract class Weapon : IEntity, IPrototype<Weapon>
     {
         public string Id { get; set; } = Guid.NewGuid().ToString();
         public virtual string SerializeToCsv()
@@ -135,6 +135,18 @@ namespace WeaponGameRestApi.Core
         ///////////////////////////////////////////////////////////////////////////////
         //                              CONSTRUCTORS                                 //
         ///////////////////////////////////////////////////////////////////////////////
+        public virtual Weapon Clone()
+        {
+            var clonedWeapon = (Weapon)this.MemberwiseClone();
+
+            clonedWeapon.Id = Guid.NewGuid().ToString();
+            clonedWeapon.CurrentWeaponBullet = new Bullet(CurrentWeaponBullet.Damage, CurrentWeaponBullet.Speed);
+            clonedWeapon.OnFired = null;
+            clonedWeapon.OnMissed = null;
+            clonedWeapon.OnOutOfAmmo = null;
+            return clonedWeapon;
+
+        }
         public Weapon(IGameLogger logger)
         {
             Name = "Rifle";
@@ -161,6 +173,8 @@ namespace WeaponGameRestApi.Core
         ///////////////////////////////////////////////////////////////////////////////
         //                              METHODS                                      //
         ///////////////////////////////////////////////////////////////////////////////
+        
+        
         public virtual void Fire()
         {
 

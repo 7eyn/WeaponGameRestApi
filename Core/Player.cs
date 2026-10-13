@@ -2,6 +2,10 @@
 
 namespace WeaponGameRestApi.Core
 {
+    public interface IPrototype<T>
+    {
+        T Clone();
+    }
     public interface IEntity
     {
         string Id { get; set; }
