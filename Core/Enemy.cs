@@ -4,11 +4,12 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 using WeaponGameRestApi.Controllers;
+using WeaponGameRestApi.Models;
 
 namespace WeaponGameRestApi.Core
 {
 
-    public abstract class Enemy : IDamageable, IEnemy//, IMovement
+    public abstract class Enemy : IDamageable, IEnemy, IEntity//, IMovement
     {
 
         public event Action<Enemy, int> ?OnDamaged; 
@@ -32,6 +33,8 @@ namespace WeaponGameRestApi.Core
         public int Health { get; protected set; }
         public bool IsDead => Health <= 0;
         public int Damage { get; protected set; }
+        public string Id { get; set; }=  Guid.NewGuid().ToString();
+
         public Enemy(int health, int damage)
         {
             Health = health;
@@ -124,21 +127,31 @@ namespace WeaponGameRestApi.Core
             }
         }
     }
-    public class EnemyFactory
-    {
-        private static readonly Dictionary<string, Func<int, int, Enemy>> _enemyRegistry
-            = new Dictionary<string, Func<int, int, Enemy>>(StringComparer.OrdinalIgnoreCase);
 
-        
-        static EnemyFactory()
+
+    public interface IEnemyFactory
+    {
+        Enemy CreateEnemy(EnemyDto dto);
+    }
+    public class EnemyFactory : IEnemyFactory
+    {
+        private  readonly Dictionary<string, Func<EnemyDto, Enemy>> _enemyRegistry
+            = new Dictionary<string, Func<EnemyDto, Enemy>>(StringComparer.OrdinalIgnoreCase);
+
+        public EnemyFactory()
         {
-            RegisterNewEnemy("tank", (health, damage) => new TankEnemy(health, damage));
-            RegisterNewEnemy("boss", (health, damage) => new BossEnemy(health, damage));
-            RegisterNewEnemy("soldier", (health, damage) => new SoldierEnemy(health, damage));
+            _enemyRegistry = new Dictionary<string, Func<EnemyDto, Enemy>>(StringComparer.OrdinalIgnoreCase);
+            RegisterDefaultEnemies();
+        }
+        private void RegisterDefaultEnemies()
+        {
+            RegisterNewEnemy("tank", (dto) => new TankEnemy(dto.Health, dto.Damage));
+            RegisterNewEnemy("boss", (dto) => new BossEnemy(dto.Health, dto.Damage));
+            RegisterNewEnemy("soldier", (dto) => new SoldierEnemy(dto.Health, dto.Damage));
         }
 
         
-        public static void RegisterNewEnemy(string type, Func<int, int, Enemy> creatorMethod)
+        public void RegisterNewEnemy(string type, Func<EnemyDto, Enemy> creatorMethod)
         {
             if (string.IsNullOrWhiteSpace(type))
                 throw new ArgumentException("Enemy type cannot be empty.");
@@ -147,15 +160,16 @@ namespace WeaponGameRestApi.Core
         }
 
         
-        public static Enemy CreateEnemy(string ?type, int health, int damage)
+        public  Enemy CreateEnemy(EnemyDto dto)
         {
-          
-            if (_enemyRegistry.TryGetValue(type ?? string.Empty, out var creatorMethod))
+           
+
+            if (_enemyRegistry.TryGetValue(dto.Type ?? string.Empty, out var creatorMethod))
             {
-                return creatorMethod(health, damage); 
+                return creatorMethod(dto); 
             }
 
-            throw new ArgumentException($"Invalid enemy type: '{type}'.");
+            throw new ArgumentException($"Invalid enemy type: '{dto.Type}'.");
         }
     }
 }

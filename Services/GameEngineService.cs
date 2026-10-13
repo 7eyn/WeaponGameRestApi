@@ -10,7 +10,10 @@ namespace WeaponGameRestApi.Services
         private readonly IGameLogger _gameLogger;
         public Player CurrentPlayer { get; private set; }
         public List<Enemy> Enemies { get; private set; } = new List<Enemy>();
+
         public Weapon ?CurrentWeapon { get; private set; }
+        private readonly List<Weapon> _weapons = new List<Weapon>();
+        private readonly object _weaponsLock = new object();
         public GameEngineService(IHubContext<GameHub> hubContext, IGameLogger gameLogger)
         {
             _hubContext = hubContext;
@@ -18,8 +21,32 @@ namespace WeaponGameRestApi.Services
 
             CurrentPlayer = new Player(1500);
         }
+        public void AddWeapon(Weapon weapon)
+        {
+            lock (_weaponsLock)
+            {
+                _weapons.Add(weapon);
+            }
+        }
+        public Weapon? GetWeapon(int index)
+        {
+            lock (_weaponsLock)
+            {
+                if (index >= 0 && index < _weapons.Count)
+                {
+                    return _weapons[index];
+                }
+                return null;
+            }
+        }
         public void SetWeapon(Weapon weapon)
         {
+            if (CurrentWeapon != null)
+            {
+                CurrentWeapon.OnFired -= async (w, damage) => { };
+                CurrentWeapon.OnMissed -= async (w) => { };
+                CurrentWeapon.OnOutOfAmmo -= async (w) => { };
+            }
             CurrentWeapon = weapon;
 
             

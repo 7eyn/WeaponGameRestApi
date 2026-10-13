@@ -1,4 +1,6 @@
 ﻿
+using WeaponGameRestApi.Models;
+
 public class InvalidRecordException : Exception
 {
     public InvalidRecordException(string message) : base(message)
@@ -12,7 +14,7 @@ namespace WeaponGameRestApi.Core
 {
     internal class InputFromFile
     {
-        public static List<Weapon> ReadWeaponsFromFile(string filePath, IGameLogger logger)
+        public static List<Weapon> ReadWeaponsFromFile(string filePath, IGameLogger logger, IWeaponFactory _weaponFactory)
         {
             var weapons = new List<Weapon>();
             int lineNumber = 0;
@@ -23,12 +25,12 @@ namespace WeaponGameRestApi.Core
                     lineNumber++;
                     if (string.IsNullOrWhiteSpace(line))
                     {
-                        logger.Log($"Line {lineNumber}: Empty or whitespace line skipped.");
+                        
                         continue;
                     }
                     try
                     {
-                        var weapon = ParseLine(line, lineNumber, logger);
+                        var weapon = ParseLine(line, lineNumber,_weaponFactory);
                         weapons.Add(weapon);
                     }
                     catch (InvalidRecordException ex)
@@ -43,7 +45,7 @@ namespace WeaponGameRestApi.Core
             }
             return weapons;
         }
-        public static Weapon ParseLine(string line, int lineNumber, IGameLogger logger)
+        public static Weapon ParseLine(string line, int lineNumber, IWeaponFactory _weaponFactory)
         {
             var parts = line.Split(';');
             try
@@ -52,7 +54,26 @@ namespace WeaponGameRestApi.Core
                 {
                     throw new InvalidRecordException($"Line {lineNumber}: Not enough parameters to create a weapon.");
                 }
-                return WeaponFactory.CreateWeapon(parts, lineNumber, logger);
+                string type = parts[0].Trim();
+                var dto = new WeaponDto
+                {
+                    Type = type,
+                    Name = parts[1].Trim(),
+                    Damage = int.Parse(parts[2].Trim()),
+                    BulletSpeed = double.Parse(parts[3].Trim(), System.Globalization.CultureInfo.InvariantCulture),
+                    MaxAmmo = int.Parse(parts[4].Trim()),
+                    CurrentAmmo = int.Parse(parts[5].Trim()),
+                    FireRate = double.Parse(parts[6].Trim(), System.Globalization.CultureInfo.InvariantCulture)
+                };
+                if (parts.Length > 7)
+                {
+                    if (type.Equals("Rifle", StringComparison.OrdinalIgnoreCase))
+                        dto.IsAutomatic = bool.Parse(parts[7].Trim());
+                    else if (type.Equals("Shotgun", StringComparison.OrdinalIgnoreCase))
+                        dto.PelletCount = int.Parse(parts[7].Trim());
+                }
+
+                return _weaponFactory.CreateWeapon(dto);
             }
 
             catch (Exception ex)

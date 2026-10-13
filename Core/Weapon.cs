@@ -5,12 +5,13 @@ using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 using WeaponGameRestApi.Core;
-
+using WeaponGameRestApi.Models;
 
 namespace WeaponGameRestApi.Core
 {
-    public class Weapon
+    public class Weapon : IEntity
     {
+        public string Id { get; set; } = Guid.NewGuid().ToString();
         public virtual string SerializeToCsv()
         {
             return $"{GetType().Name}; {Name}; {CurrentWeaponBullet.Damage}; {CurrentWeaponBullet.Speed}; {MaxAmmo}; {CurrentAmmo}; {FireRate}";
@@ -278,46 +279,55 @@ class Shotgun : Weapon
 ///////////////////////////////////////////////////////////////////////////////
 //                              FACTORY                                      //
 ///////////////////////////////////////////////////////////////////////////////
-
-public class WeaponFactory
+public interface IWeaponFactory
 {
-    private static readonly Dictionary<string, Func<string[], IGameLogger, Weapon>> _weaponRegistry
-        = new Dictionary<string, Func<string[], IGameLogger, Weapon>>(StringComparer.OrdinalIgnoreCase);
-
-
-    static WeaponFactory()
+    Weapon CreateWeapon(WeaponDto dto);
+}
+public class WeaponFactory : IWeaponFactory
+{
+    private readonly IGameLogger _logger;
+    private readonly Dictionary<string, Func<WeaponDto, IGameLogger, Weapon>> _weaponRegistry
+        = new Dictionary<string, Func<WeaponDto, IGameLogger, Weapon>>(StringComparer.OrdinalIgnoreCase);
+    public WeaponFactory(IGameLogger logger)
     {
-        RegisterNewWeapon("Revolver", (parts, logger) => new Revolver(
-                parts[1].Trim(),
-                int.Parse(parts[2].Trim()),
-                double.Parse(parts[3].Trim(), System.Globalization.CultureInfo.InvariantCulture),
-                int.Parse(parts[5].Trim()),
-                double.Parse(parts[6].Trim(), System.Globalization.CultureInfo.InvariantCulture),
+        _logger = logger;
+        _weaponRegistry = new Dictionary<string, Func<WeaponDto, IGameLogger, Weapon>>(StringComparer.OrdinalIgnoreCase);
+        RegisterDefaultWeapons();
+    }
+
+    private void RegisterDefaultWeapons()
+    {
+        RegisterNewWeapon("Revolver", (dto, logger) => new Revolver(
+                dto.Name ?? "Default Revolver",
+                dto.Damage,
+                dto.BulletSpeed,
+                dto.CurrentAmmo,
+                dto.FireRate,
                 logger));
 
-        RegisterNewWeapon("Rifle", (parts, logger) => new Rifle(
-            parts[1].Trim(),
-            int.Parse(parts[2].Trim()),
-            double.Parse(parts[3].Trim(), System.Globalization.CultureInfo.InvariantCulture),
-            int.Parse(parts[4].Trim()),
-            int.Parse(parts[5].Trim()),
-            double.Parse(parts[6].Trim(), System.Globalization.CultureInfo.InvariantCulture),
-            bool.Parse(parts[7].Trim()),
-            logger));
+        RegisterNewWeapon("Rifle", (dto, logger) => new Rifle(
+            dto.Name ?? "Default Rifle",
+                dto.Damage,
+                dto.BulletSpeed,
+                dto.MaxAmmo,
+                dto.CurrentAmmo,
+                dto.FireRate,
+                dto.IsAutomatic,
+                logger));
 
-        RegisterNewWeapon("Shotgun", (parts, logger) => new Shotgun(
-            parts[1].Trim(),
-            int.Parse(parts[2].Trim()),
-            double.Parse(parts[3].Trim(), System.Globalization.CultureInfo.InvariantCulture),
-            int.Parse(parts[4].Trim()),
-            int.Parse(parts[5].Trim()),
-            double.Parse(parts[6].Trim(), System.Globalization.CultureInfo.InvariantCulture),
-            int.Parse(parts[7].Trim()),
-            logger));
+        RegisterNewWeapon("Shotgun", (dto, logger) => new Shotgun(
+            dto.Name ?? "Default Shotgun",
+                dto.Damage,
+                dto.BulletSpeed,
+                dto.MaxAmmo,
+                dto.CurrentAmmo,
+                dto.FireRate,
+                dto.PelletCount,
+                logger));
     }
 
 
-    public static void RegisterNewWeapon(string type, Func<string[], IGameLogger, Weapon> creatorMethod)
+    public void RegisterNewWeapon(string type, Func<WeaponDto, IGameLogger, Weapon> creatorMethod)
     {
         if (string.IsNullOrWhiteSpace(type))
             throw new ArgumentException("Weapon type cannot be empty.");
@@ -326,23 +336,19 @@ public class WeaponFactory
     }
 
 
-    public static Weapon CreateWeapon(string[] parts,int lineNumber, IGameLogger logger)
+    public  Weapon CreateWeapon(WeaponDto dto)
     {
 
-        string typeOfObject = parts[0].Trim();
-
-        if (_weaponRegistry.TryGetValue(typeOfObject, out var creatorMethod))
+        if (string.IsNullOrWhiteSpace(dto.Type))
         {
-            try
-            {
-                return creatorMethod(parts, logger);
-            }
-            catch (Exception ex)
-            {
-                throw new InvalidRecordException($"Line {lineNumber}: Non-numeric value or incorrect data type. Details: {ex.Message}");
-            }
+            throw new ArgumentException("Weapon type is not specified in the DTO.");
         }
 
-        throw new InvalidRecordException($"Line {lineNumber}: Unknown weapon type '{typeOfObject}'.");
+        if (_weaponRegistry.TryGetValue(dto.Type, out var creatorMethod))
+        {
+            return creatorMethod(dto, _logger);
+        }
+
+        throw new InvalidRecordException("Unknown weapon type '{dto.Type}'.");
     }
 }

@@ -2,6 +2,10 @@
 
 namespace WeaponGameRestApi.Core
 {
+    public interface IEntity
+    {
+        string Id { get; set; }
+    }
     public interface IDamageable
     {
         void TakeDamage(int damage);
@@ -25,10 +29,11 @@ namespace WeaponGameRestApi.Core
         void Crouch();
         void Dash();
     }
-    public class Player : IDamageable//, IMovement, IControllable
+    public class Player : IDamageable, IEntity//, IMovement, IControllable
     {
         public int Health { get; private set; }
         public bool IsDead => Health <= 0;
+        public string ?Id { get; set; }
 
         public Player(int health)
         {

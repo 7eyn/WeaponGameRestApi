@@ -17,6 +17,8 @@ builder.Services.AddSignalR();
 builder.Services.AddSingleton<IGameLogger, SignalRLogger>();
                     
 builder.Services.AddSingleton<GameEngineService>();
+builder.Services.AddSingleton<IWeaponFactory, WeaponFactory>();
+builder.Services.AddSingleton<IEnemyFactory, EnemyFactory>();
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
@@ -32,7 +34,6 @@ if (app.Environment.IsDevelopment())
 app.UseAuthorization();
 app.MapControllers();
 
-// Мапимо маршрут для вебсокетів
 app.MapHub<GameHub>("/gamehub");
 
 app.Run();

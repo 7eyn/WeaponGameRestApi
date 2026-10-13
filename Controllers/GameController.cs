@@ -17,20 +17,22 @@ namespace WeaponGameRestApi.Controllers
 
     public class GameController : ControllerBase
     {
-        static List<Weapon> weapons = new List<Weapon>();
+        
         private readonly GameEngineService _gameEngineService;
-        private readonly IGameLogger _logger;
-       public GameController(GameEngineService gameEngineService, IGameLogger logger)
+        private readonly IWeaponFactory _weaponFactory;
+        private readonly IEnemyFactory _enemyFactory;
+       public GameController(GameEngineService gameEngineService, IWeaponFactory weaponFactory, IEnemyFactory enemyFactory)
         {
             _gameEngineService = gameEngineService;
-            _logger = logger;
+            _weaponFactory = weaponFactory;
+            _enemyFactory = enemyFactory;
         }
         [HttpPost("add-enemy")]
         public IActionResult Add([FromBody] EnemyDto dto)
         {
             try
             {
-                var enemy = EnemyFactory.CreateEnemy(dto.Type, dto.Health, dto.Damage);
+                var enemy = _enemyFactory.CreateEnemy(dto);
 
                 _gameEngineService.AddEnemy(enemy); 
                 return Ok(new { message = $"Enemy {enemy.Name} added" });
@@ -73,8 +75,8 @@ namespace WeaponGameRestApi.Controllers
                 };
 
                 
-                var weapon = WeaponFactory.CreateWeapon(parts, 1, _logger);
-                weapons.Add(weapon);
+                var weapon = _weaponFactory.CreateWeapon(dto);
+                _gameEngineService.AddWeapon(weapon);
 
                 _gameEngineService.SetWeapon(weapon);
 
@@ -88,8 +90,9 @@ namespace WeaponGameRestApi.Controllers
         [HttpGet("status")]
         public IActionResult GetStatus()
         {
-            return Ok(new
+            return Ok(new   
             {
+
                 PlayerHealth = _gameEngineService.CurrentPlayer.Health,
                 EnemiesCount = _gameEngineService.Enemies.Count
             });
@@ -97,7 +100,7 @@ namespace WeaponGameRestApi.Controllers
         [HttpGet("set-weapon")]
         public IActionResult SetWeapon([FromQuery] int weaponId)
         {
-            var weapon = weapons[weaponId-1];
+            var weapon = _gameEngineService.GetWeapon(weaponId - 1);
             if (weapon == null)
             {
                 return NotFound(new { message = $"Weapon {weaponId} not found." });
